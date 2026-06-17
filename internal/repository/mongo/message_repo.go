@@ -64,7 +64,7 @@ func (r *mongoMessageRepo) GetByConversation(ctx context.Context, userID1, userI
 	skip := int64(offset)
 	limited := int64(limit)
 	opts := &options.FindOptions{
-		Sort:  bson.D{{"created_at", -1}},
+		Sort:  bson.D{{Key: "created_at", Value: -1}},
 		Skip:  &skip,
 		Limit: &limited,
 	}
