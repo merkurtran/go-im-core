@@ -9,6 +9,7 @@ type User struct {
 	Nickname  string    `bson:"nickname" json:"nickname"`
 	Avatar    string    `bson:"avatar" json:"avatar"`
 	Status    string    `bson:"status" json:"status"`
+	IsDeleted bool      `bson:"is_deleted" json:"is_deleted"`
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
 }

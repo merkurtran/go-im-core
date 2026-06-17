@@ -1,0 +1,27 @@
+# 基础公共配置（提交 git）
+app:
+  name: go-im-core
+  version: "1.0.0"
+  env: dev
+  description: Go IM Core Service
+
+mongo:
+  uri: mongodb://localhost:27017
+  database: go_im_core
+  username: admin
+  password: your_password
+  timeout: 10
+
+jwt:
+  secret: your-secret-key-change-in-production
+  expire: 86400 # 24h (seconds)
+
+http:
+  port: 8080
+  timeout: 30
+
+log:
+  level: debug
+  file: logs/app.log
+  max_size: 100 # MB
+  max_age: 7    # days
