@@ -11,9 +11,23 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Service-level sentinel errors — re-exported from domain for handler consumption.
 var (
-	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrUserAlreadyExists         = user.ErrUserAlreadyExists
+	ErrInvalidUsernameOrPassword = user.ErrInvalidUsernameOrPassword
 )
+
+type UpdateUserRequest struct {
+	Nickname string `json:"nickname"`
+	Avatar   string `json:"avatar"`
+}
+
+func (r *UpdateUserRequest) Validate() error {
+	if r.Nickname != "" && (len([]rune(r.Nickname)) < 2 || len([]rune(r.Nickname)) > 20) {
+		return errors.New("nickname length must be 2-20 characters")
+	}
+	return nil
+}
 
 type RegisterRequest struct {
 	Username string `json:"username"`
@@ -69,7 +83,7 @@ func (s *UserService) Register(ctx context.Context, req *RegisterRequest) (*Regi
 		return nil, err
 	}
 	if existing != nil {
-		return nil, ErrUserAlreadyExists
+		return nil, user.ErrUserAlreadyExists
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -102,27 +116,27 @@ func (s *UserService) Register(ctx context.Context, req *RegisterRequest) (*Regi
 
 func (s *UserService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
 	//
-	user, err := s.repo.GetByUsername(ctx, req.Username)
+	u, err := s.repo.GetByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, errors.New("invalid username or password")
+	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password)); err != nil {
+		return nil, user.ErrInvalidUsernameOrPassword
 	}
 
-	token, err := jwt.GenerateToken(user.ID, s.jwtConfig.Secret, s.jwtConfig.Expire)
+	token, err := jwt.GenerateToken(u.ID, s.jwtConfig.Secret, s.jwtConfig.Expire)
 	if err != nil {
 		return nil, err
 	}
 
 	return &LoginResponse{
 		User: UserInfo{
-			ID:       user.ID,
-			Username: user.Username,
-			Nickname: user.Nickname,
-			Avatar:   user.Avatar,
-			Status:   user.Status,
+			ID:       u.ID,
+			Username: u.Username,
+			Nickname: u.Nickname,
+			Avatar:   u.Avatar,
+			Status:   u.Status,
 		},
 		Token: token,
 	}, nil
@@ -132,18 +146,29 @@ func (s *UserService) GetUserByID(ctx context.Context, id string) (*user.User, e
 	return s.repo.GetByID(ctx, id)
 }
 
-func (s *UserService) UpdateUser(ctx context.Context, id string, nickname, avatar string) error {
+// UpdateUser only allows updating nickname and avatar
+func (s *UserService) UpdateUser(ctx context.Context, id string, req *UpdateUserRequest) error {
 	if id == "" {
 		return errors.New("user id is required")
+	}
+	if err := req.Validate(); err != nil {
+		return err
 	}
 
 	existing, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
+	if existing == nil {
+		return user.ErrUserNotFound
+	}
 
-	existing.Nickname = nickname
-	existing.Avatar = avatar
+	if req.Nickname != "" {
+		existing.Nickname = req.Nickname
+	}
+	if req.Avatar != "" {
+		existing.Avatar = req.Avatar
+	}
 
 	return s.repo.Update(ctx, existing)
 }
