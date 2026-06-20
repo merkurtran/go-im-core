@@ -15,6 +15,8 @@ type MessageRepository interface {
 	// Mark a message as read
 	MarkAsRead(ctx context.Context, messageID string) error
 
+	MarkConversationAsRead(ctx context.Context, currentUserID, otherUserID string) error
+
 	Update(ctx context.Context, message *Message) error
 	Delete(ctx context.Context, id string) error
 }

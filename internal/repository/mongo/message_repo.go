@@ -117,6 +117,17 @@ func (r *mongoMessageRepo) MarkAsRead(ctx context.Context, messageID string) err
 	return nil
 }
 
+func (r *mongoMessageRepo) MarkConversationAsRead(ctx context.Context, currentUserID, otherUserID string) error {
+	_, err := r.collection.UpdateMany(ctx,
+		bson.M{"sender_id": otherUserID, "receiver_id": currentUserID, "status": bson.M{"$ne": "read"}},
+		bson.M{"$set": bson.M{"status": "read", "read_at": time.Now()}},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *mongoMessageRepo) Update(ctx context.Context, message *message.Message) error {
 	objectID, err := primitive.ObjectIDFromHex(message.ID)
 	if err != nil {
