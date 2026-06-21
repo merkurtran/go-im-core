@@ -10,6 +10,10 @@ type UserHandler struct {
 	userSvc *service.UserService
 }
 
+func NewUserHandler(userSvc *service.UserService) *UserHandler {
+	return &UserHandler{userSvc: userSvc}
+}
+
 // Get /users/me
 func (h *UserHandler) GetProfile(c *gin.Context) {
 	//
