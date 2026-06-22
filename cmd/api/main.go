@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,12 +22,16 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
+
+	setupLogger(cfg)
 
 	client, err := database.NewMongoClient(&cfg.MongoDB)
 	if err != nil {
-		log.Fatalf("failed to connect to mongo: %v", err)
+		slog.Error("failed to connect to mongo", "error", err)
+		os.Exit(1)
 	}
 	defer database.Disconnect(client)
 
@@ -36,13 +40,15 @@ func main() {
 	userRepo := mongo.NewUserRepo(db)
 	messageRepo := mongo.NewMessageRepo(db)
 
-	userSvc := service.NewUserService(userRepo, &cfg.JWT)
+	tokenGen := service.NewJWTTokenGenerator(cfg.JWT.Secret, cfg.JWT.Expire)
+	userSvc := service.NewUserService(userRepo, tokenGen)
 	msgSvc := service.NewMessageService(messageRepo, userRepo)
 
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 
-	wsH := handler.NewWebSocketHandler(wsHub, userSvc, msgSvc, cfg.JWT.Secret)
+	msgRouter := websocket.NewDefaultMessageRouter(msgSvc, userSvc, wsHub)
+	wsH := handler.NewWebSocketHandler(wsHub, userSvc, msgSvc, msgRouter, cfg.JWT.Secret)
 
 	authH := handler.NewAuthHandler(userSvc)
 	userH := handler.NewUserHandler(userSvc)
@@ -58,21 +64,37 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Server starting on: %d", cfg.HTTP.Port)
-		if err := srv.ListenAndServe(); err != nil {
-			log.Printf("Server error: %v", err)
+		slog.Info("server starting", "port", cfg.HTTP.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "error", err)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
-	log.Println("Server shutting down...")
+	slog.Info("server shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("server forced to shutdown", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Server exiting")
+	slog.Info("server exited")
+}
+
+func setupLogger(cfg *config.Config) {
+	level := slog.LevelInfo
+	switch cfg.Log.Level {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	}
+	opts := &slog.HandlerOptions{Level: level}
+	handler := slog.NewTextHandler(os.Stdout, opts)
+	slog.SetDefault(slog.New(handler))
 }

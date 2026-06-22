@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/merkurtran/go-im-core/internal/service"
-	"github.com/merkurtran/go-im-core/pkg/response"
+	"github.com/merkurtran/go-im-core/internal/response"
 )
 
 type MessageHandler struct {
@@ -25,7 +25,12 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
+	// 强制从认证上下文获取发送者，防止伪造
 	req.SenderID = c.GetString("user_id")
+	if req.SenderID == "" {
+		response.Error(c, 1002, "unauthorized")
+		return
+	}
 
 	resp, err := h.msgSvc.SendMessage(c.Request.Context(), &req)
 	if err != nil {

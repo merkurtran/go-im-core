@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/merkurtran/go-im-core/internal/service"
-	"github.com/merkurtran/go-im-core/pkg/response"
+	"github.com/merkurtran/go-im-core/internal/response"
 )
 
 type UserHandler struct {
@@ -16,15 +16,17 @@ func NewUserHandler(userSvc *service.UserService) *UserHandler {
 
 // Get /users/me
 func (h *UserHandler) GetProfile(c *gin.Context) {
-	//
 	userID := c.GetString("user_id")
 	user, err := h.userSvc.GetUserByID(c.Request.Context(), userID)
 	if err != nil {
 		response.Error(c, 5001, "server error")
 		return
 	}
+	if user == nil {
+		response.Error(c, 1004, "user not found")
+		return
+	}
 	response.Success(c, user)
-
 }
 
 // Patch /users/me

@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
@@ -22,16 +23,26 @@ type mongoUserRepo struct {
 }
 
 func NewUserRepo(db *mongo.Database) user.UserRepository {
-	return &mongoUserRepo{
+	repo := &mongoUserRepo{
 		collection: db.Collection("users"),
 	}
+	// 初始化索引：username 唯一
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	repo.collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "username", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	return repo
 }
 
-func (r *mongoUserRepo) Create(ctx context.Context, user *user.User) error {
-	user.CreatedAt = time.Now()
-	user.UpdatedAt = time.Now()
+func (r *mongoUserRepo) Create(ctx context.Context, u *user.User) error {
+	now := time.Now()
+	u.CreatedAt = now
+	u.UpdatedAt = now
 
-	result, err := r.collection.InsertOne(ctx, user)
+	dto := toUserDTO(u)
+	result, err := r.collection.InsertOne(ctx, dto)
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return ErrUserAlreadyExists
@@ -39,7 +50,7 @@ func (r *mongoUserRepo) Create(ctx context.Context, user *user.User) error {
 		return err
 	}
 
-	user.ID = result.InsertedID.(primitive.ObjectID).Hex()
+	u.ID = result.InsertedID.(primitive.ObjectID).Hex()
 	return nil
 }
 
@@ -49,42 +60,41 @@ func (r *mongoUserRepo) GetByID(ctx context.Context, id string) (*user.User, err
 		return nil, ErrInvalidID
 	}
 
-	var user user.User
-	err = r.collection.FindOne(ctx, bson.M{"_id": objectID, "is_deleted": false}).Decode(&user)
+	var dto userDTO
+	err = r.collection.FindOne(ctx, bson.M{"_id": objectID, "is_deleted": false}).Decode(&dto)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, ErrUserNotFound
+			return nil, nil
 		}
 		return nil, err
 	}
 
-	return &user, nil
-
+	return toUserModel(&dto), nil
 }
 
 func (r *mongoUserRepo) GetByUsername(ctx context.Context, username string) (*user.User, error) {
-	var user user.User
-	err := r.collection.FindOne(ctx, bson.M{"username": username, "is_deleted": false}).Decode(&user)
+	var dto userDTO
+	err := r.collection.FindOne(ctx, bson.M{"username": username, "is_deleted": false}).Decode(&dto)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, ErrUserNotFound
+			return nil, nil
 		}
 		return nil, err
 	}
 
-	return &user, nil
+	return toUserModel(&dto), nil
 }
 
-func (r *mongoUserRepo) Update(ctx context.Context, user *user.User) error {
-	objectID, err := primitive.ObjectIDFromHex(user.ID)
+func (r *mongoUserRepo) Update(ctx context.Context, u *user.User) error {
+	objectID, err := primitive.ObjectIDFromHex(u.ID)
 	if err != nil {
 		return ErrInvalidID
 	}
 
 	update := bson.M{"$set": bson.M{
-		"nickname":   user.Nickname,
-		"avatar":     user.Avatar,
-		"status":     user.Status,
+		"nickname":   u.Nickname,
+		"avatar":     u.Avatar,
+		"status":     u.Status,
 		"updated_at": time.Now(),
 	}}
 

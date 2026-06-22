@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -70,9 +70,9 @@ func Load() (*Config, error) {
 
 	v.SetConfigName(envConfigName)
 	if err := v.MergeInConfig(); err == nil {
-		log.Printf("Merged env config: %s.yaml\n", envConfigName)
+		slog.Info("merged env config", "file", envConfigName+".yaml")
 	} else if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-		log.Printf("Warning: failed to read %s.yaml: %v\n", envConfigName, err)
+		slog.Warn("failed to read env config", "file", envConfigName+".yaml", "error", err)
 	}
 
 	v.SetEnvPrefix("CONFIG")
@@ -81,11 +81,11 @@ func Load() (*Config, error) {
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
-		log.Fatalf("Failed to unmarshal config: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 
 	if err := config.Validate(); err != nil {
-		log.Fatalf("Config validation failed: %v", err)
+		return nil, fmt.Errorf("config validation failed: %v", err)
 	}
 
 	return &config, nil

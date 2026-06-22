@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 
-	"github.com/merkurtran/go-im-core/internal/config"
 	"github.com/merkurtran/go-im-core/internal/domain/user"
 	"github.com/merkurtran/go-im-core/pkg/jwt"
 	"github.com/merkurtran/go-im-core/pkg/validator"
@@ -15,6 +15,7 @@ import (
 var (
 	ErrUserAlreadyExists         = user.ErrUserAlreadyExists
 	ErrInvalidUsernameOrPassword = user.ErrInvalidUsernameOrPassword
+	ErrUserNotFound              = user.ErrUserNotFound
 )
 
 type UpdateUserRequest struct {
@@ -58,15 +59,33 @@ type LoginResponse struct {
 	Token string   `json:"token"`
 }
 
-type UserService struct {
-	repo      user.UserRepository
-	jwtConfig *config.JWTConfig
+// TokenGenerator 抽象 JWT 生成，解耦 config 依赖
+type TokenGenerator interface {
+	Generate(userID string) (string, error)
 }
 
-func NewUserService(repo user.UserRepository, jwtConfig *config.JWTConfig) *UserService {
+type jwtTokenGenerator struct {
+	secret string
+	expire int
+}
+
+func NewJWTTokenGenerator(secret string, expireSeconds int) TokenGenerator {
+	return &jwtTokenGenerator{secret: secret, expire: expireSeconds}
+}
+
+func (g *jwtTokenGenerator) Generate(userID string) (string, error) {
+	return jwt.GenerateToken(userID, g.secret, g.expire)
+}
+
+type UserService struct {
+	repo    user.UserRepository
+	tokenGen TokenGenerator
+}
+
+func NewUserService(repo user.UserRepository, tokenGen TokenGenerator) *UserService {
 	return &UserService{
-		repo:      repo,
-		jwtConfig: jwtConfig,
+		repo:     repo,
+		tokenGen: tokenGen,
 	}
 }
 
@@ -103,7 +122,7 @@ func (s *UserService) Register(ctx context.Context, req *RegisterRequest) (*Regi
 		return nil, err
 	}
 
-	token, err := jwt.GenerateToken(newUser.ID, s.jwtConfig.Secret, s.jwtConfig.Expire)
+	token, err := s.tokenGen.Generate(newUser.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,17 +134,20 @@ func (s *UserService) Register(ctx context.Context, req *RegisterRequest) (*Regi
 }
 
 func (s *UserService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
-	//
 	u, err := s.repo.GetByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, err
+	}
+	if u == nil {
+		// 统一返回，防止用户枚举攻击
+		return nil, user.ErrInvalidUsernameOrPassword
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password)); err != nil {
 		return nil, user.ErrInvalidUsernameOrPassword
 	}
 
-	token, err := jwt.GenerateToken(u.ID, s.jwtConfig.Secret, s.jwtConfig.Expire)
+	token, err := s.tokenGen.Generate(u.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -175,4 +197,17 @@ func (s *UserService) UpdateUser(ctx context.Context, id string, req *UpdateUser
 
 func (s *UserService) DeleteUser(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
+}
+
+func (s *UserService) UpdateUserStatus(ctx context.Context, id string, status string) error {
+	u, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		slog.Error("UpdateUserStatus failed", "error", err)
+		return err
+	}
+	if u == nil {
+		return user.ErrUserNotFound
+	}
+	u.Status = status
+	return s.repo.Update(ctx, u)
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -16,6 +17,7 @@ type WebSocketHandler struct {
 	hub         *ws.Hub
 	userService *service.UserService
 	msgService  *service.MessageService
+	msgRouter   ws.MessageRouter
 	jwtSecret   string
 	// allowedOrigins 用于 CORS 白名单校验，生产环境应配置具体域名
 	allowedOrigins []string
@@ -25,11 +27,12 @@ var upgrader = wslib.AcceptOptions{
 	OriginPatterns: []string{"localhost", "127.0.0.1"}, // 允许的 Origin 前缀
 }
 
-func NewWebSocketHandler(hub *ws.Hub, userSvc *service.UserService, msgSvc *service.MessageService, jwtSecret string) *WebSocketHandler {
+func NewWebSocketHandler(hub *ws.Hub, userSvc *service.UserService, msgSvc *service.MessageService, msgRouter ws.MessageRouter, jwtSecret string) *WebSocketHandler {
 	return &WebSocketHandler{
 		hub:         hub,
 		userService: userSvc,
 		msgService:  msgSvc,
+		msgRouter:   msgRouter,
 		jwtSecret:   jwtSecret,
 	}
 }
@@ -59,25 +62,32 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 	// 3. WebSocket 升级（必须在认证之后）
 	conn, err := wslib.Accept(c.Writer, c.Request, &upgrader)
 	if err != nil {
-		// Accept 失败时响应已写入，仅需记录日志
 		return
 	}
-	// 确保 WebSocket 连接在异常退出时被关闭
 	defer conn.Close(wslib.StatusInternalError, "connection closed unexpectedly")
 
 	// 4. 注册客户端到 Hub
-	client := ws.NewClient(h.hub, conn, claims.UserID)
+	client := ws.NewClient(h.hub, conn, claims.UserID, h.msgRouter)
 	h.hub.Register(client)
-	// 确保断开时从 Hub 注销
 	defer h.hub.Unregister(client)
 
-	// 5. 推送未读消息数（非关键路径，忽略错误）
+	// 5. 更新用户状态为在线
+	if err := h.userService.UpdateUserStatus(c.Request.Context(), claims.UserID, "online"); err != nil {
+		slog.Warn("failed to update user status to online", "user_id", claims.UserID, "error", err)
+	}
+	defer func() {
+		if err := h.userService.UpdateUserStatus(c.Request.Context(), claims.UserID, "offline"); err != nil {
+			slog.Warn("failed to update user status to offline", "user_id", claims.UserID, "error", err)
+		}
+	}()
+
+	// 6. 推送未读消息数
 	unreadCount, _ := h.msgService.GetUnreadCount(c.Request.Context(), claims.UserID)
 	if unreadCount > 0 {
 		h.hub.SendToUser(claims.UserID, []byte(fmt.Sprintf(`{"event":"unread","count":%d}`, unreadCount)))
 	}
 
-	// 6. 启动读写 Pump（阻塞直到连接关闭）
+	// 7. 启动读写 Pump（阻塞直到连接关闭）
 	go client.WritePump()
-	client.ReadPump() // 主 goroutine 阻塞在 ReadPump
+	client.ReadPump()
 }

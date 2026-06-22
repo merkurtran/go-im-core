@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrMessageNotFound = errors.New("message not found")
+	// ErrInvalidID       = errors.New("invalid id format")
 )
 
 type mongoMessageRepo struct {
@@ -21,21 +22,41 @@ type mongoMessageRepo struct {
 }
 
 func NewMessageRepo(db *mongo.Database) message.MessageRepository {
-	return &mongoMessageRepo{
+	repo := &mongoMessageRepo{
 		collection: db.Collection("messages"),
 	}
+	// 初始化复合索引：conversation + created_at
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	repo.collection.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys: bson.D{
+				{Key: "sender_id", Value: 1},
+				{Key: "receiver_id", Value: 1},
+				{Key: "created_at", Value: -1},
+			},
+		},
+		{
+			Keys: bson.D{
+				{Key: "receiver_id", Value: 1},
+				{Key: "status", Value: 1},
+			},
+		},
+	})
+	return repo
 }
 
-func (r *mongoMessageRepo) Create(ctx context.Context, message *message.Message) error {
-	message.CreatedAt = time.Now()
+func (r *mongoMessageRepo) Create(ctx context.Context, msg *message.Message) error {
+	msg.CreatedAt = time.Now()
 
-	result, err := r.collection.InsertOne(ctx, message)
+	dto := toMessageDTO(msg)
+	result, err := r.collection.InsertOne(ctx, dto)
 	if err != nil {
 		return err
 	}
 
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		message.ID = oid.Hex()
+		msg.ID = oid.Hex()
 	}
 	return nil
 }
@@ -46,21 +67,19 @@ func (r *mongoMessageRepo) GetByID(ctx context.Context, id string) (*message.Mes
 		return nil, ErrInvalidID
 	}
 
-	var msg message.Message
-	err = r.collection.FindOne(ctx, bson.M{"_id": objectID, "is_deleted": false}).Decode(&msg)
+	var dto messageDTO
+	err = r.collection.FindOne(ctx, bson.M{"_id": objectID, "is_deleted": false}).Decode(&dto)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, ErrMessageNotFound
+			return nil, nil
 		}
 		return nil, err
 	}
 
-	return &msg, nil
+	return toMessageModel(&dto), nil
 }
 
 func (r *mongoMessageRepo) GetByConversation(ctx context.Context, userID1, userID2 string, limit, offset int) ([]*message.Message, error) {
-	var messages []*message.Message
-
 	skip := int64(offset)
 	limited := int64(limit)
 	opts := &options.FindOptions{
@@ -76,13 +95,14 @@ func (r *mongoMessageRepo) GetByConversation(ctx context.Context, userID1, userI
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
-	err = cursor.All(ctx, &messages)
-	if err != nil {
+	var dtos []*messageDTO
+	if err := cursor.All(ctx, &dtos); err != nil {
 		return nil, err
 	}
 
-	return messages, nil
+	return toMessageModels(dtos), nil
 }
 
 func (r *mongoMessageRepo) GetUnreadCount(ctx context.Context, userID string) (int, error) {
@@ -128,8 +148,8 @@ func (r *mongoMessageRepo) MarkConversationAsRead(ctx context.Context, currentUs
 	return nil
 }
 
-func (r *mongoMessageRepo) Update(ctx context.Context, message *message.Message) error {
-	objectID, err := primitive.ObjectIDFromHex(message.ID)
+func (r *mongoMessageRepo) Update(ctx context.Context, msg *message.Message) error {
+	objectID, err := primitive.ObjectIDFromHex(msg.ID)
 	if err != nil {
 		return ErrInvalidID
 	}
@@ -137,9 +157,9 @@ func (r *mongoMessageRepo) Update(ctx context.Context, message *message.Message)
 	result, err := r.collection.UpdateOne(ctx,
 		bson.M{"_id": objectID, "is_deleted": false},
 		bson.M{"$set": bson.M{
-			"content":  message.Content,
-			"msg_type": message.MsgType,
-			"status":   message.Status,
+			"content":  msg.Content,
+			"msg_type": msg.MsgType,
+			"status":   msg.Status,
 		}},
 	)
 	if err != nil {

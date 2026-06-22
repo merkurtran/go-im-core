@@ -2,16 +2,16 @@ package service
 
 import (
 	"context"
-	"errors"
+	"log/slog"
 
 	"github.com/merkurtran/go-im-core/internal/domain/message"
 	"github.com/merkurtran/go-im-core/internal/domain/user"
 	"github.com/merkurtran/go-im-core/pkg/validator"
 )
 
-var (
-	ErrUserNotFound = errors.New("user not found")
-)
+// var (
+// 	ErrUserNotFound = errors.New("user not found")
+// )
 
 type MessageService struct {
 	repo     message.MessageRepository
@@ -25,6 +25,7 @@ type SendMessageRequest struct {
 	MessageType string `json:"message_type"` // text, image, file
 	Status      string `json:"status"`
 }
+
 type SendMessageResponse struct {
 	MessageID string `json:"message_id"`
 }
@@ -41,10 +42,19 @@ func (s *MessageService) SendMessage(ctx context.Context, req *SendMessageReques
 		return nil, err
 	}
 
-	if _, err := s.userRepo.GetByID(ctx, req.SenderID); err != nil {
+	sender, err := s.userRepo.GetByID(ctx, req.SenderID)
+	if err != nil {
+		return nil, err
+	}
+	if sender == nil {
 		return nil, ErrUserNotFound
 	}
-	if _, err := s.userRepo.GetByID(ctx, req.ReceiverID); err != nil {
+
+	receiver, err := s.userRepo.GetByID(ctx, req.ReceiverID)
+	if err != nil {
+		return nil, err
+	}
+	if receiver == nil {
 		return nil, ErrUserNotFound
 	}
 
@@ -62,7 +72,6 @@ func (s *MessageService) SendMessage(ctx context.Context, req *SendMessageReques
 	return &SendMessageResponse{
 		MessageID: msg.ID,
 	}, nil
-
 }
 
 func (s *MessageService) GetConversation(ctx context.Context, currentUserID, targetUserID string, limit, offset int) ([]*message.Message, error) {
@@ -79,4 +88,20 @@ func (s *MessageService) MarkConversationAsRead(ctx context.Context, currentUser
 
 func (s *MessageService) DeleteMessage(ctx context.Context, messageID string) error {
 	return s.repo.Delete(ctx, messageID)
+}
+
+// GetMessageByID 用于 WebSocket 业务层获取消息详情
+func (s *MessageService) GetMessageByID(ctx context.Context, id string) (*message.Message, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
+// OnUserConnected 用户上线时的回调（更新状态）
+func (s *MessageService) OnUserConnected(ctx context.Context, userID string) {
+	// 业务层可以在这里扩展：推送离线消息、更新已读状态等
+	slog.Info("user connected", "user_id", userID)
+}
+
+// OnUserDisconnected 用户离线时的回调
+func (s *MessageService) OnUserDisconnected(ctx context.Context, userID string) {
+	slog.Info("user disconnected", "user_id", userID)
 }
