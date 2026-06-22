@@ -10,12 +10,18 @@ func Setup(
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
 	messageHandler *handler.MessageHandler,
+	wsHandler *handler.WebSocketHandler,
 	jwtSecret string,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
 	api := r.Group("/api/v1")
+
+	ws := api.Group("/ws")
+	{
+		ws.GET("", wsHandler.HandleWebSocket)
+	}
 
 	auth := api.Group("/auth")
 	{

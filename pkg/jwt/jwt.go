@@ -27,6 +27,9 @@ func GenerateToken(userID string, secret string, expireSeconds int) (string, err
 func ParseToken(token string, secret string) (*Claims, error) {
 	claims := &Claims{}
 	tokens, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("invalid token")
+		}
 		return []byte(secret), nil
 	})
 	if err != nil {

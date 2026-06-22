@@ -15,6 +15,7 @@ import (
 	"github.com/merkurtran/go-im-core/internal/repository/mongo"
 	"github.com/merkurtran/go-im-core/internal/router"
 	"github.com/merkurtran/go-im-core/internal/service"
+	"github.com/merkurtran/go-im-core/internal/websocket"
 	"github.com/merkurtran/go-im-core/pkg/database"
 )
 
@@ -38,11 +39,16 @@ func main() {
 	userSvc := service.NewUserService(userRepo, &cfg.JWT)
 	msgSvc := service.NewMessageService(messageRepo, userRepo)
 
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+
+	wsH := handler.NewWebSocketHandler(wsHub, userSvc, msgSvc, cfg.JWT.Secret)
+
 	authH := handler.NewAuthHandler(userSvc)
 	userH := handler.NewUserHandler(userSvc)
 	msgH := handler.NewMessageHandler(msgSvc)
 
-	r := router.Setup(authH, userH, msgH, cfg.JWT.Secret)
+	r := router.Setup(authH, userH, msgH, wsH, cfg.JWT.Secret)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.HTTP.Port),
