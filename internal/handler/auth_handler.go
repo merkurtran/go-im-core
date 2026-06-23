@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/merkurtran/go-im-core/internal/service"
@@ -21,7 +22,7 @@ func NewAuthHandler(userSvc *service.UserService) *AuthHandler {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req service.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 1001, "invalid request")
+		response.Error(c, http.StatusBadRequest, 1001, "invalid request")
 		return
 	}
 
@@ -29,9 +30,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrUserAlreadyExists):
-			response.Error(c, 2001, "user already exists")
+			response.Error(c, http.StatusConflict, 2001, "user already exists")
 		default:
-			response.Error(c, 5001, "server error")
+			response.Error(c, http.StatusInternalServerError, 5001, "server error")
 		}
 		return
 	}
@@ -41,7 +42,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req service.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 1001, "invalid request")
+		response.Error(c, http.StatusBadRequest, 1001, "invalid request")
 		return
 	}
 
@@ -49,9 +50,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidUsernameOrPassword):
-			response.Error(c, 2002, "invalid username or password")
+			response.Error(c, http.StatusUnauthorized, 2002, "invalid username or password")
 		default:
-			response.Error(c, 5001, "server error")
+			response.Error(c, http.StatusInternalServerError, 5001, "server error")
 		}
 		return
 	}

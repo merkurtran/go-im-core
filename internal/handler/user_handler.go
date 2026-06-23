@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/merkurtran/go-im-core/internal/service"
 	"github.com/merkurtran/go-im-core/internal/response"
@@ -19,11 +21,11 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 	user, err := h.userSvc.GetUserByID(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, 5001, "server error")
+		response.Error(c, http.StatusInternalServerError, 5001, "server error")
 		return
 	}
 	if user == nil {
-		response.Error(c, 1004, "user not found")
+		response.Error(c, http.StatusNotFound, 1004, "user not found")
 		return
 	}
 	response.Success(c, user)
@@ -34,13 +36,13 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var req service.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 1001, "invalid request")
+		response.Error(c, http.StatusBadRequest, 1001, "invalid request")
 		return
 	}
 
 	err := h.userSvc.UpdateUser(c.Request.Context(), userID, &req)
 	if err != nil {
-		response.Error(c, 5001, "server error")
+		response.Error(c, http.StatusInternalServerError, 5001, "server error")
 		return
 	}
 	response.Success(c, nil)
