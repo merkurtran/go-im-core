@@ -29,6 +29,15 @@ go.work.sum
 config.dev.yaml
 config.prod.yaml
 
+# Frontend
+node_modules/
+web/dist/
+web/coverage/
+
 # Editor/IDE
 # .idea/
 # .vscode/
+
+
+# docs
+docs/
