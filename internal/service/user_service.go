@@ -78,7 +78,7 @@ func (g *jwtTokenGenerator) Generate(userID string) (string, error) {
 }
 
 type UserService struct {
-	repo    user.UserRepository
+	repo     user.UserRepository
 	tokenGen TokenGenerator
 }
 

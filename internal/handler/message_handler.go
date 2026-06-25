@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/merkurtran/go-im-core/internal/service"
 	"github.com/merkurtran/go-im-core/internal/response"
+	"github.com/merkurtran/go-im-core/internal/service"
 )
 
 type MessageHandler struct {
