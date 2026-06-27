@@ -1,3 +1,16 @@
+// Package main Go IM Core
+//
+// @title Go IM Core
+// @version 1.0.0
+// @host localhost:8080
+// @BasePath /api/v1
+// @schemes http
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @description Type 'Bearer &lt;token&gt;' to authenticate
+//
+// swagger:meta
 package main
 
 import (
@@ -10,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/merkurtran/go-im-core/docs"
 	"github.com/merkurtran/go-im-core/internal/config"
 	"github.com/merkurtran/go-im-core/internal/handler"
 	"github.com/merkurtran/go-im-core/internal/repository/mongo"

@@ -8,8 +8,8 @@ app:
 mongo:
   uri: mongodb://localhost:27017
   database: go_im_core
-  username: admin
-  password: your_password
+  username: ""
+  password: ""
   timeout: 10
 
 jwt:

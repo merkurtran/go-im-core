@@ -19,15 +19,18 @@ type MessageService struct {
 }
 
 type SendMessageRequest struct {
-	SenderID    string `json:"sender_id"`
+	SenderID    string `json:"-"`              // 服务端从 auth context 获取，客户端无需传入
 	ReceiverID  string `json:"receiver_id"`
 	Content     string `json:"content"`
 	MessageType string `json:"message_type"` // text, image, file
-	Status      string `json:"status"`
 }
 
 type SendMessageResponse struct {
 	MessageID string `json:"message_id"`
+}
+
+type MarkReadRequest struct {
+	OtherUserID string `json:"other_user_id"`
 }
 
 func NewMessageService(repo message.MessageRepository, userRepo user.UserRepository) *MessageService {

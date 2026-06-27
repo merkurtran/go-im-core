@@ -1,0 +1,390 @@
+basePath: /api/v1
+definitions:
+  message.Message:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      is_deleted:
+        type: boolean
+      message_id:
+        type: string
+      msg_type:
+        description: text, image, file
+        type: string
+      read_at:
+        type: string
+      receiver_id:
+        type: string
+      sender_id:
+        type: string
+      status:
+        description: sent, delivered, read
+        type: string
+    type: object
+  response.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  service.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  service.LoginResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/service.UserInfo'
+    type: object
+  service.MarkReadRequest:
+    properties:
+      other_user_id:
+        type: string
+    type: object
+  service.RegisterRequest:
+    properties:
+      nickname:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  service.RegisterResponse:
+    properties:
+      token:
+        type: string
+      user_id:
+        type: string
+    type: object
+  service.SendMessageRequest:
+    properties:
+      content:
+        type: string
+      message_type:
+        description: text, image, file
+        type: string
+      receiver_id:
+        type: string
+    type: object
+  service.SendMessageResponse:
+    properties:
+      message_id:
+        type: string
+    type: object
+  service.UpdateUserRequest:
+    properties:
+      avatar:
+        type: string
+      nickname:
+        type: string
+    type: object
+  service.UserInfo:
+    properties:
+      avatar:
+        type: string
+      nickname:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  user.User:
+    properties:
+      avatar:
+        type: string
+      created_at:
+        type: string
+      is_deleted:
+        type: boolean
+      nickname:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  title: Go IM Core
+  version: 1.0.0
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 用户名和密码登录，返回token
+      parameters:
+      - description: 登录信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 登录成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.LoginResponse'
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: 用户名或密码错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 用户登录
+      tags:
+      - 认证
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: 用用户名和密码注册新用户，返回 user_id 和 token
+      parameters:
+      - description: 注册信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 注册成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.RegisterResponse'
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "409":
+          description: 用户已存在
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 注册新用户
+      tags:
+      - 认证
+  /messages:
+    get:
+      description: 获取与指定用户的聊天消息列表
+      parameters:
+      - description: 对方的用户ID
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: 每页数量，默认20，最大100
+        in: query
+        name: limit
+        type: integer
+      - description: 偏移量
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/message.Message'
+                  type: array
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - Bearer: []
+      summary: 获取聊天记录
+      tags:
+      - 消息
+    post:
+      consumes:
+      - application/json
+      description: 发送信息
+      parameters:
+      - description: 发送的信息请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.SendMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 发送成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.SendMessageResponse'
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - Bearer: []
+      summary: 发送信息
+      tags:
+      - 消息
+  /messages/read:
+    patch:
+      consumes:
+      - application/json
+      description: 标记与指定用户的对话为已读
+      parameters:
+      - description: 标记已读请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.MarkReadRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 标记成功
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - Bearer: []
+      summary: 标记会话已读
+      tags:
+      - 消息
+  /users/me:
+    get:
+      description: 获取当前登录用户的个人资料
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.User'
+              type: object
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - Bearer: []
+      summary: 获取当前用户信息
+      tags:
+      - 用户
+    put:
+      consumes:
+      - application/json
+      description: 更新当前用户的昵称或头像
+      parameters:
+      - description: 更新信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - Bearer: []
+      summary: 更新个人信息
+      tags:
+      - 用户
+schemes:
+- http
+securityDefinitions:
+  Bearer:
+    description: Type 'Bearer &lt;token&gt;' to authenticate
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

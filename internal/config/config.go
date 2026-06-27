@@ -110,12 +110,7 @@ func (c *Config) Validate() error {
 	if c.MongoDB.Database == "" {
 		return errors.New("mongo.database is required")
 	}
-	if c.MongoDB.Username == "" {
-		return errors.New("mongo.username is required")
-	}
-	if c.MongoDB.Password == "" {
-		return errors.New("mongo.password is required")
-	}
+
 	if c.MongoDB.Timeout == 0 {
 		return errors.New("mongo.timeout is required")
 	}

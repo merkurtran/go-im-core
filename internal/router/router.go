@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/merkurtran/go-im-core/internal/handler"
 	"github.com/merkurtran/go-im-core/internal/middlewares"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func Setup(
@@ -28,6 +30,8 @@ func Setup(
 	}))
 
 	api := r.Group("/api/v1")
+
+	api.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	ws := api.Group("/ws")
 	{
