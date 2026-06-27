@@ -2,11 +2,12 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/merkurtran/go-im-core/internal/domain/user"
-	"github.com/merkurtran/go-im-core/internal/service"
 	"github.com/merkurtran/go-im-core/internal/response"
+	"github.com/merkurtran/go-im-core/internal/service"
 )
 
 // swaggerDocTypes 用于 swaggo 类型解析，无实际运行效果
@@ -72,4 +73,29 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 	response.Success(c, nil)
+}
+
+// SearchUsers 搜索用户
+//
+//	@Summary 搜索用户
+//	@Description 按用户名或昵称模糊搜索用户
+//	@Tags 用户
+//	@Produce json
+//	@Param keyword query string true "搜索关键词"
+//	@Param limit query int false "每页数量，默认10"
+//	@Param offset query int false "偏移量"
+//	@Success 200 {object} response.Response{data=[]user.User} "成功"
+//	@Failure 500 {object} response.Response "服务器错误"
+//	@Security Bearer
+//	@Router /users/search [get]
+func (h *UserHandler) SearchUsers(c *gin.Context) {
+	keyword := c.Query("keyword")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	users, err := h.userSvc.SearchUsers(c.Request.Context(), keyword, limit, offset)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, 5001, "server error")
+		return
+	}
+	response.Success(c, users)
 }

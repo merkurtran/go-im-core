@@ -195,6 +195,10 @@ func (s *UserService) UpdateUser(ctx context.Context, id string, req *UpdateUser
 	return s.repo.Update(ctx, existing)
 }
 
+func (s *UserService) SearchUsers(ctx context.Context, keyword string, limit, offset int) ([]*user.User, error) {
+	return s.repo.Search(ctx, keyword, limit, offset)
+}
+
 func (s *UserService) DeleteUser(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }

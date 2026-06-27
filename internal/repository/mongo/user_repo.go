@@ -85,6 +85,25 @@ func (r *mongoUserRepo) GetByUsername(ctx context.Context, username string) (*us
 	return toUserModel(&dto), nil
 }
 
+func (r *mongoUserRepo) Search(ctx context.Context, keyword string, limit, offset int) ([]*user.User, error) {
+	filter := bson.M{"$or": []bson.M{
+		{"username": bson.M{"$regex": keyword, "$options": "i"}},
+		{"nickname": bson.M{"$regex": keyword, "$options": "i"}},
+	}, "is_deleted": false}
+
+	cursor, err := r.collection.Find(ctx, filter, options.Find().SetLimit(int64(limit)).SetSkip(int64(offset)))
+	if err != nil {
+		return nil, err
+	}
+
+	var users []*user.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (r *mongoUserRepo) Update(ctx context.Context, u *user.User) error {
 	objectID, err := primitive.ObjectIDFromHex(u.ID)
 	if err != nil {
