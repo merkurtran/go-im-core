@@ -60,6 +60,7 @@ func Setup(
 		messages.POST("", messageHandler.SendMessage)
 		messages.GET("", messageHandler.GetConversation)
 		messages.PATCH("/read", messageHandler.MarkRead)
+		messages.PATCH("/:message_id/recall", messageHandler.RecallMessage)
 	}
 
 	return r

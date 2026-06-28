@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/merkurtran/go-im-core/internal/domain/message"
 	"github.com/merkurtran/go-im-core/internal/domain/user"
@@ -19,7 +20,7 @@ type MessageService struct {
 }
 
 type SendMessageRequest struct {
-	SenderID    string `json:"-"`              // 服务端从 auth context 获取，客户端无需传入
+	SenderID    string `json:"-"` // 服务端从 auth context 获取，客户端无需传入
 	ReceiverID  string `json:"receiver_id"`
 	Content     string `json:"content"`
 	MessageType string `json:"message_type"` // text, image, file
@@ -91,6 +92,24 @@ func (s *MessageService) MarkConversationAsRead(ctx context.Context, currentUser
 
 func (s *MessageService) DeleteMessage(ctx context.Context, messageID string) error {
 	return s.repo.Delete(ctx, messageID)
+}
+
+func (s *MessageService) RecallMessage(ctx context.Context, userID, messageID string) error {
+	msg, err := s.repo.GetByID(ctx, messageID)
+	if err != nil {
+		return err
+	}
+	if msg == nil {
+		return message.ErrMessageNotFound
+	}
+	if msg.SenderID != userID {
+		return message.ErrNotMessageSender
+	}
+	if time.Since(msg.CreatedAt) > 2*time.Minute {
+		return message.ErrRecallTimeout
+	}
+	msg.IsRecalled = true
+	return s.repo.Update(ctx, msg)
 }
 
 // GetMessageByID 用于 WebSocket 业务层获取消息详情

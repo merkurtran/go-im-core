@@ -126,3 +126,44 @@ func (h *MessageHandler) MarkRead(c *gin.Context) {
 	}
 	response.Success(c, nil)
 }
+
+// RecallMessage 撤回消息
+//
+//	@Summary 撤回消息
+//	@Description 撤回自己发送的消息（发送后2分钟内可撤回）
+//	@Tags 消息
+//	@Produce json
+//	@Param message_id path string true "消息ID"
+//	@Success 200 {object} response.Response "撤回成功"
+//	@Failure 400 {object} response.Response "请求参数错误"
+//	@Failure 403 {object} response.Response "无权撤回/超过撤回时间"
+//	@Failure 404 {object} response.Response "消息不存在"
+//	@Failure 500 {object} response.Response "服务器错误"
+//	@Security Bearer
+//	@Router /messages/{message_id}/recall [patch]
+func (h *MessageHandler) RecallMessage(c *gin.Context) {
+	messageID := c.Param("message_id")
+	if messageID == "" {
+		response.Error(c, http.StatusBadRequest, 1001, "message_id is required")
+		return
+	}
+	userID := c.GetString("user_id")
+	if userID == "" {
+		response.Error(c, http.StatusUnauthorized, 1002, "unauthorized")
+		return
+	}
+	if err := h.msgSvc.RecallMessage(c.Request.Context(), userID, messageID); err != nil {
+		switch {
+		case errors.Is(err, message.ErrMessageNotFound):
+			response.Error(c, http.StatusNotFound, 2001, "message not found")
+		case errors.Is(err, message.ErrNotMessageSender):
+			response.Error(c, http.StatusForbidden, 2002, "you are not the sender")
+		case errors.Is(err, message.ErrRecallTimeout):
+			response.Error(c, http.StatusForbidden, 2003, "recall time has expired")
+		default:
+			response.Error(c, http.StatusInternalServerError, 5001, "server error")
+		}
+		return
+	}
+	response.Success(c, nil)
+}

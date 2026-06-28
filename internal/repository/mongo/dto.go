@@ -66,6 +66,7 @@ type messageDTO struct {
 	Status     string     `bson:"status"`
 	ReadAt     *time.Time `bson:"read_at,omitempty"`
 	IsDeleted  bool       `bson:"is_deleted"`
+	IsRecalled bool       `bson:"is_recalled"`
 	CreatedAt  time.Time  `bson:"created_at"`
 }
 
@@ -82,6 +83,7 @@ func toMessageDTO(m *message.Message) *messageDTO {
 		Status:     m.Status,
 		ReadAt:     m.ReadAt,
 		IsDeleted:  m.IsDeleted,
+		IsRecalled: m.IsRecalled,
 		CreatedAt:  m.CreatedAt,
 	}
 }
@@ -99,6 +101,7 @@ func toMessageModel(d *messageDTO) *message.Message {
 		Status:     d.Status,
 		ReadAt:     d.ReadAt,
 		IsDeleted:  d.IsDeleted,
+		IsRecalled: d.IsRecalled,
 		CreatedAt:  d.CreatedAt,
 	}
 }
