@@ -51,6 +51,8 @@ func Setup(
 	{
 		users.GET("/me", userHandler.GetProfile)
 		users.PUT("/me", userHandler.UpdateProfile)
+		users.PUT("/me/password", userHandler.ChangePassword)
+		users.GET("/search", userHandler.SearchUsers)
 	}
 
 	messages := authed.Group("/messages")

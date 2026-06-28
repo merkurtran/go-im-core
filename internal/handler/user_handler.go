@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -98,4 +99,39 @@ func (h *UserHandler) SearchUsers(c *gin.Context) {
 		return
 	}
 	response.Success(c, users)
+}
+
+// ChangePassword 修改密码
+//
+//	@Summary 修改密码
+//	@Description 验证旧密码后修改为新密码
+//	@Tags 用户
+//	@Accept json
+//	@Produce json
+//	@Param request body service.ChangePasswordRequest true "密码修改信息"
+//	@Success 200 {object} response.Response "修改成功"
+//	@Failure 400 {object} response.Response "请求参数错误"
+//	@Failure 401 {object} response.Response "旧密码错误"
+//	@Failure 500 {object} response.Response "服务器错误"
+//	@Security Bearer
+//	@Router /users/me/password [put]
+func (h *UserHandler) ChangePassword(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var req service.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, 1001, "invalid request")
+		return
+	}
+
+	err := h.userSvc.ChangePassword(c.Request.Context(), userID, &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidUsernameOrPassword):
+			response.Error(c, http.StatusUnauthorized, 2002, "old password is incorrect")
+		default:
+			response.Error(c, http.StatusInternalServerError, 5001, "server error")
+		}
+		return
+	}
+	response.Success(c, nil)
 }

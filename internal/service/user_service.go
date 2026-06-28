@@ -59,6 +59,11 @@ type LoginResponse struct {
 	Token string   `json:"token"`
 }
 
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
 // TokenGenerator 抽象 JWT 生成，解耦 config 依赖
 type TokenGenerator interface {
 	Generate(userID string) (string, error)
@@ -214,4 +219,26 @@ func (s *UserService) UpdateUserStatus(ctx context.Context, id string, status st
 	}
 	u.Status = status
 	return s.repo.Update(ctx, u)
+}
+
+func (s *UserService) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest) error {
+	u, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		slog.Error("ChangePassword failed", "error", err)
+		return err
+	}
+	if u == nil {
+		return user.ErrUserNotFound
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.OldPassword)); err != nil {
+		return user.ErrInvalidUsernameOrPassword
+	}
+	if err := validator.ValidatePassword(req.NewPassword); err != nil {
+		return err
+	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdatePassword(ctx, userID, string(hashedPassword))
 }

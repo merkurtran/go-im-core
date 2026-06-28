@@ -127,6 +127,21 @@ func (r *mongoUserRepo) Update(ctx context.Context, u *user.User) error {
 	return nil
 }
 
+func (r *mongoUserRepo) UpdatePassword(ctx context.Context, userID, hashedPassword string) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return ErrInvalidID
+	}
+	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": objectID}, bson.M{"$set": bson.M{"password": hashedPassword, "updated_at": time.Now()}})
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
 func (r *mongoUserRepo) Delete(ctx context.Context, id string) error {
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
